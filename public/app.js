@@ -61,6 +61,7 @@ function tryNormalizeUrl(candidate) {
   }
 }
 
+// Pick the first valid URL from comma/whitespace-separated input.
 function normalizeVideoUrl(input) {
   const candidates = input.split(/[\s,]+/).filter(Boolean);
   for (const candidate of candidates) {
@@ -185,6 +186,7 @@ function applyVideo(url, startTime) {
   };
 
   const setReady = () => {
+    if (video.classList.contains('ready')) return;
     video.classList.add('ready');
     video.removeEventListener('error', onError);
   };
@@ -197,10 +199,10 @@ function applyVideo(url, startTime) {
 
   video.addEventListener('error', onError);
 
-  if (video.readyState >= 1) onMeta();
+  if (video.readyState >= video.HAVE_METADATA) onMeta();
   else video.addEventListener('loadedmetadata', onMeta, { once: true });
 
-  if (video.readyState < 2) {
+  if (video.readyState < video.HAVE_CURRENT_DATA) {
     video.addEventListener('loadeddata', setReady, { once: true });
   }
 }
