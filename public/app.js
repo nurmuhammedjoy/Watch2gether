@@ -8,6 +8,9 @@ let myName     = 'Guest';
 let isSyncing  = false;   // suppress re-emit while applying remote events
 let lastSeekT  = -1;      // deduplicate our own seek broadcasts
 let ctrlTimer  = null;
+let pendingMetaHandler = null;
+let pendingDataHandler = null;
+let pendingErrorHandler = null;
 
 // ── DOM ────────────────────────────────────────────────
 const $id = id => document.getElementById(id);
@@ -69,6 +72,15 @@ function normalizeVideoUrl(input) {
     if (normalized) return normalized;
   }
   return '';
+}
+
+function clearVideoHandlers() {
+  if (pendingMetaHandler) video.removeEventListener('loadedmetadata', pendingMetaHandler);
+  if (pendingDataHandler) video.removeEventListener('loadeddata', pendingDataHandler);
+  if (pendingErrorHandler) video.removeEventListener('error', pendingErrorHandler);
+  pendingMetaHandler = null;
+  pendingDataHandler = null;
+  pendingErrorHandler = null;
 }
 
 let pillTimer;
@@ -168,6 +180,7 @@ function applyVideo(url, startTime) {
   videoUrlInput.value = url;
   emptyState.classList.add('hidden');
   video.classList.remove('ready');
+  clearVideoHandlers();
 
   // Reset state
   video.pause();
@@ -182,27 +195,39 @@ function applyVideo(url, startTime) {
     video.classList.remove('ready');
     setPlayUI(false);
     toast('Video failed to load. Make sure the URL is public and CORS-enabled.');
-    video.removeEventListener('error', onError);
+    clearVideoHandlers();
   };
-
-  video.addEventListener('error', onError);
 
   const setReady = () => {
     if (video.classList.contains('ready')) return;
     video.classList.add('ready');
-    video.removeEventListener('error', onError);
   };
 
   const onMeta = () => {
     if (startTime > 0) video.currentTime = startTime;
     timeDur.textContent = fmt(video.duration);
+    pendingMetaHandler = null;
   };
 
+  const onData = () => {
+    setReady();
+    pendingDataHandler = null;
+  };
+
+  pendingErrorHandler = onError;
+  video.addEventListener('error', onError);
+
   if (video.readyState >= video.HAVE_METADATA) onMeta();
-  else video.addEventListener('loadedmetadata', onMeta, { once: true });
+  else {
+    pendingMetaHandler = onMeta;
+    video.addEventListener('loadedmetadata', onMeta, { once: true });
+  }
 
   if (video.readyState >= video.HAVE_CURRENT_DATA) setReady();
-  else video.addEventListener('loadeddata', setReady, { once: true });
+  else {
+    pendingDataHandler = onData;
+    video.addEventListener('loadeddata', onData, { once: true });
+  }
 }
 
 // ── Socket: room state on join ─────────────────────────
