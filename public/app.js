@@ -53,12 +53,19 @@ function toast(msg, cls = '') {
   setTimeout(() => el.remove(), 3200);
 }
 
+function tryNormalizeUrl(candidate) {
+  try {
+    return new URL(candidate).toString();
+  } catch (error) {
+    return '';
+  }
+}
+
 function normalizeVideoUrl(input) {
   const candidates = input.split(/[\s,]+/).filter(Boolean);
   for (const candidate of candidates) {
-    try {
-      return new URL(candidate).toString();
-    } catch {}
+    const normalized = tryNormalizeUrl(candidate);
+    if (normalized) return normalized;
   }
   return '';
 }
@@ -169,8 +176,17 @@ function applyVideo(url, startTime) {
   video.src = url;
   video.load();
 
+  const onError = () => {
+    emptyState.classList.remove('hidden');
+    video.classList.remove('ready');
+    setPlayUI(false);
+    toast('Video failed to load. Make sure the URL is public and CORS-enabled.');
+    video.removeEventListener('error', onError);
+  };
+
   const setReady = () => {
     video.classList.add('ready');
+    video.removeEventListener('error', onError);
   };
 
   const onMeta = () => {
@@ -179,20 +195,13 @@ function applyVideo(url, startTime) {
     setReady();
   };
 
-  const onError = () => {
-    emptyState.classList.remove('hidden');
-    video.classList.remove('ready');
-    setPlayUI(false);
-    toast('Video failed to load. Make sure the URL is public and CORS-enabled.');
-  };
+  video.addEventListener('error', onError);
 
   if (video.readyState >= 1) onMeta();
   else video.addEventListener('loadedmetadata', onMeta, { once: true });
 
   if (video.readyState >= 2) setReady();
   else video.addEventListener('loadeddata', setReady, { once: true });
-
-  video.addEventListener('error', onError, { once: true });
 }
 
 // ── Socket: room state on join ─────────────────────────
