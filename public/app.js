@@ -53,6 +53,16 @@ function toast(msg, cls = '') {
   setTimeout(() => el.remove(), 3200);
 }
 
+function normalizeVideoUrl(input) {
+  const candidates = input.split(/[\s,]+/).filter(Boolean);
+  for (const candidate of candidates) {
+    try {
+      return new URL(candidate).toString();
+    } catch {}
+  }
+  return '';
+}
+
 let pillTimer;
 function pill(msg) {
   syncPill.textContent = msg;
@@ -130,21 +140,26 @@ $id('btn-copy-link').addEventListener('click', () => {
 // ── Leave ──────────────────────────────────────────────
 $id('btn-leave').addEventListener('click', () => { location.href = '/'; });
 
-// ── Load video ─────────────────────────────────────────
+// Load videos
 $id('btn-load-video').addEventListener('click', loadVideo);
 videoUrlInput.addEventListener('keydown', e => { if (e.key === 'Enter') loadVideo(); });
 
 function loadVideo() {
-  const url = videoUrlInput.value.trim();
-  if (!url) return;
+  const raw = videoUrlInput.value.trim();
+  if (!raw) return;
+  const url = normalizeVideoUrl(raw);
+  if (!url) {
+    toast('Paste a direct video URL (.mp4, .webm, .mov)');
+    return;
+  }
   socket.emit('set-video', { url });
   applyVideo(url, 0);
 }
 
-// THE FIX: set src and call load() first; seek only after metadata is ready
 function applyVideo(url, startTime) {
   videoUrlInput.value = url;
   emptyState.classList.add('hidden');
+  video.classList.remove('ready');
 
   // Reset state
   video.pause();
@@ -154,14 +169,30 @@ function applyVideo(url, startTime) {
   video.src = url;
   video.load();
 
-  // After metadata loads, seek to the right time
-  const onMeta = () => {
-    video.removeEventListener('loadedmetadata', onMeta);
-    if (startTime > 0) video.currentTime = startTime;
+  const setReady = () => {
     video.classList.add('ready');
-    timeDur.textContent = fmt(video.duration);
   };
-  video.addEventListener('loadedmetadata', onMeta);
+
+  const onMeta = () => {
+    if (startTime > 0) video.currentTime = startTime;
+    timeDur.textContent = fmt(video.duration);
+    setReady();
+  };
+
+  const onError = () => {
+    emptyState.classList.remove('hidden');
+    video.classList.remove('ready');
+    setPlayUI(false);
+    toast('Video failed to load. Make sure the URL is public and CORS-enabled.');
+  };
+
+  if (video.readyState >= 1) onMeta();
+  else video.addEventListener('loadedmetadata', onMeta, { once: true });
+
+  if (video.readyState >= 2) setReady();
+  else video.addEventListener('loadeddata', setReady, { once: true });
+
+  video.addEventListener('error', onError, { once: true });
 }
 
 // ── Socket: room state on join ─────────────────────────
