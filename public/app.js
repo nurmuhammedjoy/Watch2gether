@@ -185,6 +185,8 @@ function applyVideo(url, startTime) {
     video.removeEventListener('error', onError);
   };
 
+  video.addEventListener('error', onError);
+
   const setReady = () => {
     if (video.classList.contains('ready')) return;
     video.classList.add('ready');
@@ -194,17 +196,13 @@ function applyVideo(url, startTime) {
   const onMeta = () => {
     if (startTime > 0) video.currentTime = startTime;
     timeDur.textContent = fmt(video.duration);
-    setReady();
   };
-
-  video.addEventListener('error', onError);
 
   if (video.readyState >= video.HAVE_METADATA) onMeta();
   else video.addEventListener('loadedmetadata', onMeta, { once: true });
 
-  if (video.readyState < video.HAVE_CURRENT_DATA) {
-    video.addEventListener('loadeddata', setReady, { once: true });
-  }
+  if (video.readyState >= video.HAVE_CURRENT_DATA) setReady();
+  else video.addEventListener('loadeddata', setReady, { once: true });
 }
 
 // ── Socket: room state on join ─────────────────────────
