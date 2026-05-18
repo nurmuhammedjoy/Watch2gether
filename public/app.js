@@ -156,7 +156,7 @@ function loadVideo() {
   if (!raw) return;
   const url = normalizeVideoUrl(raw);
   if (!url) {
-    toast('Paste a direct video URL (.mp4, .webm, .mov)');
+    toast('Paste a valid video URL');
     return;
   }
   socket.emit('set-video', { url });
@@ -200,8 +200,9 @@ function applyVideo(url, startTime) {
   if (video.readyState >= 1) onMeta();
   else video.addEventListener('loadedmetadata', onMeta, { once: true });
 
-  if (video.readyState >= 2) setReady();
-  else video.addEventListener('loadeddata', setReady, { once: true });
+  if (video.readyState < 2) {
+    video.addEventListener('loadeddata', setReady, { once: true });
+  }
 }
 
 // ── Socket: room state on join ─────────────────────────
