@@ -8,6 +8,9 @@ let myName     = 'Guest';
 let isSyncing  = false;   // suppress re-emit while applying remote events
 let lastSeekT  = -1;      // deduplicate our own seek broadcasts
 let ctrlTimer  = null;
+let pendingMetaHandler = null;
+let pendingDataHandler = null;
+let pendingErrorHandler = null;
 
 // ── DOM ────────────────────────────────────────────────
 const $id = id => document.getElementById(id);
@@ -51,6 +54,33 @@ function toast(msg, cls = '') {
   el.textContent = msg;
   $id('toasts').appendChild(el);
   setTimeout(() => el.remove(), 3200);
+}
+
+function tryNormalizeUrl(candidate) {
+  try {
+    return new URL(candidate).toString();
+  } catch (error) {
+    return '';
+  }
+}
+
+// Pick the first valid URL from comma/whitespace-separated input.
+function normalizeVideoUrl(input) {
+  const candidates = input.split(/[\s,]+/).filter(Boolean);
+  for (const candidate of candidates) {
+    const normalized = tryNormalizeUrl(candidate);
+    if (normalized) return normalized;
+  }
+  return '';
+}
+
+function clearVideoHandlers() {
+  if (pendingMetaHandler) video.removeEventListener('loadedmetadata', pendingMetaHandler);
+  if (pendingDataHandler) video.removeEventListener('loadeddata', pendingDataHandler);
+  if (pendingErrorHandler) video.removeEventListener('error', pendingErrorHandler);
+  pendingMetaHandler = null;
+  pendingDataHandler = null;
+  pendingErrorHandler = null;
 }
 
 let pillTimer;
@@ -130,21 +160,27 @@ $id('btn-copy-link').addEventListener('click', () => {
 // ── Leave ──────────────────────────────────────────────
 $id('btn-leave').addEventListener('click', () => { location.href = '/'; });
 
-// ── Load video ─────────────────────────────────────────
+// Load videos
 $id('btn-load-video').addEventListener('click', loadVideo);
 videoUrlInput.addEventListener('keydown', e => { if (e.key === 'Enter') loadVideo(); });
 
 function loadVideo() {
-  const url = videoUrlInput.value.trim();
-  if (!url) return;
+  const raw = videoUrlInput.value.trim();
+  if (!raw) return;
+  const url = normalizeVideoUrl(raw);
+  if (!url) {
+    toast('Paste a valid video URL');
+    return;
+  }
   socket.emit('set-video', { url });
   applyVideo(url, 0);
 }
 
-// THE FIX: set src and call load() first; seek only after metadata is ready
 function applyVideo(url, startTime) {
   videoUrlInput.value = url;
   emptyState.classList.add('hidden');
+  video.classList.remove('ready');
+  clearVideoHandlers();
 
   // Reset state
   video.pause();
@@ -154,14 +190,44 @@ function applyVideo(url, startTime) {
   video.src = url;
   video.load();
 
-  // After metadata loads, seek to the right time
-  const onMeta = () => {
-    video.removeEventListener('loadedmetadata', onMeta);
-    if (startTime > 0) video.currentTime = startTime;
-    video.classList.add('ready');
-    timeDur.textContent = fmt(video.duration);
+  const onError = () => {
+    emptyState.classList.remove('hidden');
+    video.classList.remove('ready');
+    setPlayUI(false);
+    toast('Video failed to load. Make sure the URL is public and CORS-enabled.');
+    clearVideoHandlers();
   };
-  video.addEventListener('loadedmetadata', onMeta);
+
+  const setReady = () => {
+    if (video.classList.contains('ready')) return;
+    video.classList.add('ready');
+  };
+
+  const onMeta = () => {
+    if (startTime > 0) video.currentTime = startTime;
+    timeDur.textContent = fmt(video.duration);
+    pendingMetaHandler = null;
+  };
+
+  const onData = () => {
+    setReady();
+    pendingDataHandler = null;
+  };
+
+  pendingErrorHandler = onError;
+  video.addEventListener('error', onError);
+
+  if (video.readyState >= video.HAVE_METADATA) onMeta();
+  else {
+    pendingMetaHandler = onMeta;
+    video.addEventListener('loadedmetadata', onMeta, { once: true });
+  }
+
+  if (video.readyState >= video.HAVE_CURRENT_DATA) setReady();
+  else {
+    pendingDataHandler = onData;
+    video.addEventListener('loadeddata', onData, { once: true });
+  }
 }
 
 // ── Socket: room state on join ─────────────────────────
