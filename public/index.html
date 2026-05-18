@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SyncWatch</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+
+<!-- LOBBY -->
+<div id="lobby" class="screen active">
+  <div class="lobby-wrap">
+    <div class="lobby-top">
+      <div class="wordmark">SyncWatch</div>
+      <p class="sub">Watch together, perfectly in sync.</p>
+    </div>
+
+    <div class="lobby-card">
+      <div class="tabs">
+        <button class="tab active" data-tab="create">Create</button>
+        <button class="tab" data-tab="join">Join</button>
+      </div>
+
+      <div class="tab-panel active" id="tab-create">
+        <div class="field">
+          <label>Name</label>
+          <input id="create-name" type="text" placeholder="Your name" maxlength="24" autocomplete="off" />
+        </div>
+        <button class="btn-primary" id="btn-create">Create room</button>
+      </div>
+
+      <div class="tab-panel" id="tab-join">
+        <div class="field">
+          <label>Name</label>
+          <input id="join-name" type="text" placeholder="Your name" maxlength="24" autocomplete="off" />
+        </div>
+        <div class="field">
+          <label>Room ID</label>
+          <input id="join-room-id" type="text" placeholder="e.g. A1B2C3D4" maxlength="8" autocomplete="off" spellcheck="false" style="text-transform:uppercase" />
+        </div>
+        <button class="btn-primary" id="btn-join">Join room</button>
+      </div>
+
+      <p class="hint">No account needed. Rooms are temporary.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ROOM -->
+<div id="room" class="screen">
+
+  <header class="hdr">
+    <div class="hdr-left">
+      <span class="room-id-badge" id="room-id-label"></span>
+      <span class="viewer-badge">
+        <span class="live-dot"></span>
+        <span id="member-count">1</span>
+      </span>
+    </div>
+    <div class="hdr-right">
+      <button class="hdr-btn" id="btn-copy-link">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+        </svg>
+        Copy link
+      </button>
+      <button class="hdr-btn hdr-btn--leave" id="btn-leave">Leave</button>
+    </div>
+  </header>
+
+  <main class="room-main">
+
+    <!-- Video column -->
+    <div class="video-col">
+      <div class="url-bar">
+        <input id="video-url" type="url" placeholder="Paste a direct video URL (.mp4, .webm…)" spellcheck="false" autocomplete="off" />
+        <button id="btn-load-video" class="btn-load">Load</button>
+      </div>
+
+      <div class="player-wrap" id="player-wrap">
+        <div class="empty-state" id="empty-state">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
+            <rect x="2" y="2" width="20" height="20" rx="3"/>
+            <path d="M10 8l6 4-6 4V8z"/>
+          </svg>
+          <p>Load a video URL above to start watching</p>
+        </div>
+
+        <video id="video" preload="metadata"></video>
+
+        <div class="controls" id="controls">
+          <div class="progress-wrap" id="progress-wrap">
+            <div class="progress-track" id="progress-track">
+              <div class="progress-buf" id="progress-buf"></div>
+              <div class="progress-fill" id="progress-fill"></div>
+            </div>
+            <div class="progress-thumb" id="progress-thumb"></div>
+          </div>
+
+          <div class="ctrl-row">
+            <div class="ctrl-left">
+              <button class="ctrl-btn" id="btn-play">
+                <svg id="icon-play" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M5 3l14 9-14 9V3z"/></svg>
+                <svg id="icon-pause" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="display:none"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
+              </button>
+
+              <div class="vol-wrap">
+                <button class="ctrl-btn" id="btn-mute">
+                  <svg id="icon-vol" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+                    <path d="M15.54 8.46a5 5 0 010 7.07"/>
+                    <path d="M19.07 4.93a10 10 0 010 14.14"/>
+                  </svg>
+                  <svg id="icon-mute" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="display:none">
+                    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+                    <line x1="22" y1="9" x2="16" y2="15"/>
+                    <line x1="16" y1="9" x2="22" y2="15"/>
+                  </svg>
+                </button>
+                <input type="range" id="volume" class="vol-slider" min="0" max="1" step="0.02" value="1" />
+              </div>
+
+              <span class="timecode">
+                <span id="time-cur">0:00</span>
+                <span class="tsep">/</span>
+                <span id="time-dur">0:00</span>
+              </span>
+            </div>
+
+            <div class="ctrl-right">
+              <button class="ctrl-btn" id="btn-sync" title="Re-sync with room">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+                  <polyline points="23 4 23 10 17 10"/>
+                  <path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/>
+                </svg>
+              </button>
+              <button class="ctrl-btn" id="btn-fs" title="Fullscreen">
+                <svg id="icon-expand" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+                  <path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"/>
+                </svg>
+                <svg id="icon-compress" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" style="display:none">
+                  <path d="M8 3v3a2 2 0 01-2 2H3m18 0h-3a2 2 0 01-2-2V3m0 18v-3a2 2 0 012-2h3M3 16h3a2 2 0 012 2v3"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="sync-pill" id="sync-pill"></div>
+      </div>
+    </div>
+
+    <!-- Chat -->
+    <aside class="chat-col">
+      <div class="chat-hdr">Chat</div>
+      <div class="chat-feed" id="chat-feed"></div>
+      <div class="chat-compose">
+        <input id="chat-input" type="text" placeholder="Message…" maxlength="200" autocomplete="off" />
+        <button id="btn-send" class="btn-send">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M2 21l21-9L2 3v7l15 2-15 2v7z"/></svg>
+        </button>
+      </div>
+    </aside>
+
+  </main>
+</div>
+
+<div id="toasts" class="toasts"></div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="/app.js"></script>
+</body>
+</html>
